@@ -6,14 +6,22 @@ import type { Article } from "@/types/database";
 interface ArticleCardProps {
   article: Article;
   onStar?: (startupName: string) => void;
+  onUnstar?: (startupId: string) => void;
+  starredStartups?: { id: string; name: string }[];
   onPin?: (item: { type: "article"; id: string; title: string; url: string }) => void;
-  starredStartups?: string[];
   isPinned?: boolean;
 }
 
-export function ArticleCard({ article, onStar, onPin, starredStartups = [], isPinned }: ArticleCardProps) {
+export function ArticleCard({ article, onStar, onUnstar, onPin, starredStartups = [], isPinned }: ArticleCardProps) {
   const name = article.related_tracked_startup || extractStartupName(article.title);
-  const isStarred = name ? starredStartups.some((s) => s.toLowerCase() === name.toLowerCase()) : false;
+  const starred = name ? starredStartups.find((s) => s.name.toLowerCase() === name.toLowerCase()) : null;
+  const isStarred = !!starred;
+
+  const handleStarClick = () => {
+    if (!name) return;
+    if (isStarred && onUnstar && starred) onUnstar(starred.id);
+    else if (!isStarred && onStar) onStar(name);
+  };
 
   return (
     <article className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
@@ -56,12 +64,12 @@ export function ArticleCard({ article, onStar, onPin, starredStartups = [], isPi
           </div>
         </div>
         <div className="flex shrink-0 gap-1">
-          {name && onStar && (
+          {name && (onStar || onUnstar) && (
             <button
               type="button"
-              onClick={() => onStar(name)}
+              onClick={handleStarClick}
               className="rounded p-1.5 text-lg hover:bg-neutral-100 dark:hover:bg-neutral-800"
-              title={isStarred ? "Starred" : "Star startup"}
+              title={isStarred ? "Stop tracking" : "Track startup"}
             >
               {isStarred ? "★" : "☆"}
             </button>

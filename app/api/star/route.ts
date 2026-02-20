@@ -21,7 +21,8 @@ export async function POST(request: Request) {
       .from("startups")
       .select("id")
       .ilike("name", startupName.trim())
-      .single();
+      .limit(1)
+      .maybeSingle();
 
     if (!startup) {
       const { data: inserted } = await supabase
@@ -63,12 +64,13 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "userId and startupId required" }, { status: 400 });
     }
 
-    await supabaseAdmin
+    const { error } = await supabaseAdmin
       .from("starred_startups")
       .delete()
       .eq("user_id", userId)
       .eq("startup_id", startupId);
 
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error("Unstar error:", e);

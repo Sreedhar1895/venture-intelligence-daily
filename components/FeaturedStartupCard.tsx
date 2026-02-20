@@ -6,12 +6,20 @@ import type { Startup } from "@/types/database";
 interface FeaturedStartupCardProps {
   startup: Startup;
   onStar?: (name: string) => void;
+  onUnstar?: (startupId: string) => void;
+  starredStartups?: { id: string; name: string }[];
   onPin?: (item: { type: "startup"; id: string; title: string; url: string }) => void;
-  isStarred?: boolean;
   isPinned?: boolean;
 }
 
-export function FeaturedStartupCard({ startup, onStar, onPin, isStarred, isPinned }: FeaturedStartupCardProps) {
+export function FeaturedStartupCard({ startup, onStar, onUnstar, starredStartups = [], onPin, isPinned }: FeaturedStartupCardProps) {
+  const starred = starredStartups.find((s) => s.name.toLowerCase() === startup.name.toLowerCase());
+  const isStarred = !!starred;
+
+  const handleStarClick = () => {
+    if (isStarred && onUnstar && starred) onUnstar(starred.id);
+    else if (!isStarred && onStar) onStar(startup.name);
+  };
   const links = Array.isArray(startup.links) ? startup.links : [];
   const primaryUrl = startup.website || (links[0]?.url) || "#";
   const signals = (startup.signals || {}) as { signed_customers?: boolean; team_grew?: boolean; raised_funding?: boolean };
@@ -86,12 +94,12 @@ export function FeaturedStartupCard({ startup, onStar, onPin, isStarred, isPinne
           )}
         </div>
         <div className="flex shrink-0 gap-1">
-          {onStar && (
+          {(onStar || onUnstar) && (
             <button
               type="button"
-              onClick={() => onStar(startup.name)}
+              onClick={handleStarClick}
               className="rounded p-1.5 text-lg hover:bg-neutral-100 dark:hover:bg-neutral-800"
-              title={isStarred ? "Following" : "Follow startup"}
+              title={isStarred ? "Stop tracking" : "Track startup"}
             >
               {isStarred ? "★" : "☆"}
             </button>

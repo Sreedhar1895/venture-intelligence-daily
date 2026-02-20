@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
 import { ArticleCard } from "./ArticleCard";
 import { EventsList } from "./EventsList";
 import { ResearchCard } from "./ResearchCard";
@@ -28,7 +27,7 @@ export function Dashboard() {
   const [featuredStartups, setFeaturedStartups] = useState<Startup[]>([]);
   const [pins, setPins] = useState<PinnedItem[]>([]);
   const [updates, setUpdates] = useState<unknown[]>([]);
-  const [starredNames, setStarredNames] = useState<string[]>([]);
+  const [starredStartups, setStarredStartups] = useState<{ id: string; name: string }[]>([]);
   const [sector, setSector] = useState("All");
   const [stage, setStage] = useState("");
   const [tab, setTab] = useState<TabType>("signals");
@@ -65,14 +64,9 @@ export function Dashboard() {
       const jsonPins = await resPins.json();
       if (!cancelled) setPins(Array.isArray(jsonPins.pins) ? (jsonPins.pins as PinnedItem[]) : []);
 
-      const { data: starData } = await supabase
-        .from("starred_startups")
-        .select("startups(name)")
-        .eq("user_id", DEMO_USER_ID);
-      const names = (starData || [])
-        .map((s) => (s as { startups: { name: string } | null }).startups?.name)
-        .filter(Boolean) as string[];
-      if (!cancelled) setStarredNames(names);
+      const resStarred = await fetch(`/api/starred?userId=${DEMO_USER_ID}`);
+      const jsonStarred = await resStarred.json();
+      if (!cancelled) setStarredStartups(Array.isArray(jsonStarred.starred) ? jsonStarred.starred : []);
 
       const updatesRes = await fetch(`/api/tracked-updates?userId=${DEMO_USER_ID}`);
       const updatesJson = await updatesRes.json();
@@ -114,7 +108,7 @@ export function Dashboard() {
   };
 
   const handleStar = async (startupName: string) => {
-    await fetch("/api/star", {
+    const res = await fetch("/api/star", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -122,7 +116,18 @@ export function Dashboard() {
         startupName,
       }),
     });
-    setStarredNames((prev) => (prev.includes(startupName) ? prev : [...prev, startupName]));
+    const json = await res.json();
+    if (json.startupId)
+      setStarredStartups((prev) =>
+        prev.some((s) => s.name.toLowerCase() === startupName.toLowerCase())
+          ? prev
+          : [...prev, { id: json.startupId, name: startupName }]
+      );
+  };
+
+  const handleUnstar = async (startupId: string) => {
+    await fetch(`/api/star?userId=${DEMO_USER_ID}&startupId=${startupId}`, { method: "DELETE" });
+    setStarredStartups((prev) => prev.filter((s) => s.id !== startupId));
   };
 
   return (
@@ -218,8 +223,9 @@ export function Dashboard() {
                       key={article.id}
                       article={article}
                       onStar={handleStar}
+                      onUnstar={handleUnstar}
+                      starredStartups={starredStartups}
                       onPin={handlePin}
-                      starredStartups={starredNames}
                       isPinned={isPinned("article", article.id)}
                     />
                   ))}
@@ -282,8 +288,9 @@ export function Dashboard() {
                     key={s.id}
                     startup={s}
                     onStar={handleStar}
+                    onUnstar={handleUnstar}
+                    starredStartups={starredStartups}
                     onPin={handlePin}
-                    isStarred={starredNames.some((n) => n.toLowerCase() === s.name.toLowerCase())}
                     isPinned={isPinned("startup", s.id)}
                   />
                 ))}
@@ -332,20 +339,42 @@ export function Dashboard() {
 
           {tab === "tracked" && (
             <div className="space-y-4">
-              {updates.length === 0 ? (
-                <p className="text-neutral-500">No updates for starred startups yet.</p>
+              <h3 className="font-semibold">Startups you&apos;re tracking</h3>
+              {starredStartups.length === 0 ? (
+                <p className="text-neutral-500">Star startups from Top Signals or Startups to Watch to track them here.</p>
               ) : (
-                updates.map((u: { id: string; title: string; url?: string; startups?: { name: string } }) => (
+                starredStartups.map((s) => (
                   <div
-                    key={u.id}
-                    className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+                    key={s.id}
+                    className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
                   >
-                    <a href={u.url || "#"} className="font-medium hover:underline">
-                      {u.title}
-                    </a>
-                    <p className="mt-1 text-sm text-neutral-500">{u.startups?.name}</p>
+                    <span className="font-medium">{s.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleUnstar(s.id)}
+                      className="rounded px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                      title="Stop tracking"
+                    >
+                      ★ Unstar
+                    </button>
                   </div>
                 ))
+              )}
+              {(updates as unknown[]).length > 0 && (
+                <>
+                  <h3 className="mt-6 font-semibold">Updates</h3>
+                  {(updates as { id: string; title: string; url?: string; startups?: { name: string } }[]).map((u) => (
+                    <div
+                      key={u.id}
+                      className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+                    >
+                      <a href={u.url || "#"} className="font-medium hover:underline">
+                        {u.title}
+                      </a>
+                      <p className="mt-1 text-sm text-neutral-500">{u.startups?.name}</p>
+                    </div>
+                  ))}
+                </>
               )}
             </div>
           )}
