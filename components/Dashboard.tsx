@@ -28,6 +28,7 @@ export function Dashboard() {
   const [pins, setPins] = useState<PinnedItem[]>([]);
   const [updates, setUpdates] = useState<unknown[]>([]);
   const [starredStartups, setStarredStartups] = useState<{ id: string; name: string }[]>([]);
+  const [dismissedSet, setDismissedSet] = useState<Set<string>>(new Set());
   const [sector, setSector] = useState("All");
   const [stage, setStage] = useState("");
   const [tab, setTab] = useState<TabType>("signals");
@@ -72,6 +73,10 @@ export function Dashboard() {
       const updatesJson = await updatesRes.json();
       if (!cancelled) setUpdates(updatesJson.updates || []);
 
+      const resDismissed = await fetch(`/api/dismissed?userId=${DEMO_USER_ID}`);
+      const jsonDismissed = await resDismissed.json();
+      if (!cancelled) setDismissedSet(new Set(Array.isArray(jsonDismissed.dismissed) ? jsonDismissed.dismissed : []));
+
       if (!cancelled) setLoading(false);
     }
     load();
@@ -82,6 +87,7 @@ export function Dashboard() {
     sector === "All"
       ? articles
       : articles.filter((a) => a.sector_tags?.includes(sector as never));
+  const filteredArticles = filtered.filter((a) => !dismissedSet.has(`article:${a.id}`));
 
   const pinnedSet = new Set(pins.map((p) => `${p.item_type}:${p.item_id}`));
   const isPinned = (type: string, id: string) => pinnedSet.has(`${type}:${id}`);
@@ -130,6 +136,15 @@ export function Dashboard() {
     setStarredStartups((prev) => prev.filter((s) => s.id !== startupId));
   };
 
+  const handleDismiss = async (itemType: string, itemId: string) => {
+    await fetch("/api/dismissed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: DEMO_USER_ID, itemType, itemId }),
+    });
+    setDismissedSet((prev) => new Set([...prev, `${itemType}:${itemId}`]));
+  };
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
       <header className="flex items-center justify-between border-b border-neutral-200 pb-6 dark:border-neutral-800">
@@ -156,6 +171,8 @@ export function Dashboard() {
           <EventsList
             onPin={handlePin}
             pinnedEventIds={new Set(pins.filter((p) => p.item_type === "event").map((p) => p.item_id))}
+            dismissedEventIds={new Set([...dismissedSet].filter((k) => k.startsWith("event:")).map((k) => k.replace("event:", "")))}
+            onDismiss={handleDismiss}
           />
         </aside>
 
@@ -218,7 +235,7 @@ export function Dashboard() {
                 <p className="text-neutral-500">Loading...</p>
               ) : (
                 <div className="space-y-4">
-                  {filtered.map((article) => (
+                  {filteredArticles.map((article) => (
                     <ArticleCard
                       key={article.id}
                       article={article}
@@ -227,9 +244,10 @@ export function Dashboard() {
                       starredStartups={starredStartups}
                       onPin={handlePin}
                       isPinned={isPinned("article", article.id)}
+                      onDismiss={handleDismiss}
                     />
                   ))}
-                  {filtered.length === 0 && (
+                  {filteredArticles.length === 0 && (
                     <p className="text-neutral-500">
                       {articlesError
                         ? `Could not load articles: ${articlesError}. Run the SQL in supabase/migrations/001_initial_schema.sql in your Supabase project, then run ingestion.`
@@ -262,15 +280,16 @@ export function Dashboard() {
                 <p className="text-neutral-500">Loading...</p>
               ) : (
                 <div className="space-y-4">
-                  {research.map((r) => (
+                  {research.filter((r) => !dismissedSet.has(`research:${r.id}`)).map((r) => (
                     <ResearchCard
                       key={r.id}
                       research={r}
                       onPin={handlePin}
                       isPinned={isPinned("research", r.id)}
+                      onDismiss={handleDismiss}
                     />
                   ))}
-                  {research.length === 0 && (
+                  {research.filter((r) => !dismissedSet.has(`research:${r.id}`)).length === 0 && (
                     <p className="text-neutral-500">No research yet. Add research sources or run research ingest.</p>
                   )}
                 </div>
@@ -283,7 +302,7 @@ export function Dashboard() {
               <p className="text-neutral-500">Loading...</p>
             ) : (
               <div className="space-y-4">
-                {featuredStartups.map((s) => (
+                {featuredStartups.filter((s) => !dismissedSet.has(`startup:${s.id}`)).map((s) => (
                   <FeaturedStartupCard
                     key={s.id}
                     startup={s}
@@ -292,9 +311,10 @@ export function Dashboard() {
                     starredStartups={starredStartups}
                     onPin={handlePin}
                     isPinned={isPinned("startup", s.id)}
+                    onDismiss={handleDismiss}
                   />
                 ))}
-                {featuredStartups.length === 0 && (
+                {featuredStartups.filter((s) => !dismissedSet.has(`startup:${s.id}`)).length === 0 && (
                   <p className="text-neutral-500">
                     No startups to watch yet. Run ingestion to discover startups from news. Startups are scored by: vertical (1), new customers/partnerships (5), accelerator/funding (4), key hires (2), research (3). Only those with score &gt; 0 appear here.
                   </p>

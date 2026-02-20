@@ -1,19 +1,39 @@
 "use client";
 
-import { getEventsByCity } from "@/lib/events";
-import { useState, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { PinIcon } from "./PinIcon";
+import { RemoveIcon } from "./RemoveIcon";
 
 const CITIES = ["All", "San Francisco", "New York", "Boston", "Austin"];
+
+interface VentureEvent {
+  id: string;
+  title: string;
+  city: string | null;
+  date: string;
+  url: string | null;
+  registration_url: string | null;
+  source: string;
+}
 
 interface EventsListProps {
   onPin?: (item: { type: "event"; id: string; title: string; url: string }) => void;
   pinnedEventIds?: Set<string>;
+  dismissedEventIds?: Set<string>;
+  onDismiss?: (itemType: "event", itemId: string) => void;
 }
 
-export function EventsList({ onPin, pinnedEventIds }: EventsListProps) {
+export function EventsList({ onPin, pinnedEventIds, dismissedEventIds, onDismiss }: EventsListProps) {
   const [city, setCity] = useState("All");
-  const events = useMemo(() => getEventsByCity(city === "All" ? undefined : city), [city]);
+  const [events, setEvents] = useState<VentureEvent[]>([]);
+
+  useEffect(() => {
+    const qs = city === "All" ? "" : `?city=${encodeURIComponent(city)}`;
+    fetch(`/api/events${qs}`)
+      .then((r) => r.json())
+      .then((data) => setEvents(data.events ?? []))
+      .catch(() => setEvents([]));
+  }, [city]);
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
@@ -35,10 +55,10 @@ export function EventsList({ onPin, pinnedEventIds }: EventsListProps) {
         ))}
       </div>
       <ul className="mt-4 space-y-3">
-        {events.length === 0 ? (
+        {events.filter((e) => !dismissedEventIds?.has(e.id)).length === 0 ? (
           <li className="text-sm text-neutral-500">No events. Add an events source to ingest to see real data.</li>
         ) : (
-          events.map((e) => {
+          events.filter((e) => !dismissedEventIds?.has(e.id)).map((e) => {
             const eventUrl = e.url && e.url !== "#" ? e.url : e.registration_url || "#";
             return (
               <li key={e.id} className="text-sm">
@@ -55,18 +75,30 @@ export function EventsList({ onPin, pinnedEventIds }: EventsListProps) {
                   ) : (
                     <span className="font-medium">{e.title}</span>
                   )}
-                  {onPin && (
-                    <button
-                      type="button"
-                      onClick={() => onPin({ type: "event", id: e.id, title: e.title, url: e.registration_url || e.url })}
-                      className="shrink-0 rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                      title={pinnedEventIds?.has(e.id) ? "Pinned" : "Pin"}
-                    >
-                      <PinIcon pinned={pinnedEventIds?.has(e.id)} size={16} />
-                    </button>
-                  )}
+                  <div className="flex shrink-0 gap-1">
+                    {onPin && (
+                      <button
+                        type="button"
+                        onClick={() => onPin({ type: "event", id: e.id, title: e.title, url: e.registration_url || e.url || "#" })}
+                        className="rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                        title={pinnedEventIds?.has(e.id) ? "Pinned" : "Pin"}
+                      >
+                        <PinIcon pinned={pinnedEventIds?.has(e.id)} size={16} />
+                      </button>
+                    )}
+                    {onDismiss && (
+                      <button
+                        type="button"
+                        onClick={() => onDismiss("event", e.id)}
+                        className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+                        title="Remove from view"
+                      >
+                        <RemoveIcon size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <span className="block text-neutral-500">{e.city} · {e.date}</span>
+                <span className="block text-neutral-500">{e.city || "TBD"} · {e.date}</span>
                 {e.registration_url && e.registration_url !== eventUrl && (
                   <a
                     href={e.registration_url}
@@ -75,16 +107,6 @@ export function EventsList({ onPin, pinnedEventIds }: EventsListProps) {
                     className="mt-1 inline-block text-xs text-blue-600 hover:underline dark:text-blue-400"
                   >
                     Register
-                  </a>
-                )}
-                {eventUrl !== "#" && !e.registration_url && (
-                  <a
-                    href={eventUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-1 inline-block text-xs text-blue-600 hover:underline dark:text-blue-400"
-                  >
-                    Event link
                   </a>
                 )}
               </li>

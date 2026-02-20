@@ -1,15 +1,17 @@
 "use client";
 
 import { PinIcon } from "./PinIcon";
+import { RemoveIcon } from "./RemoveIcon";
 import type { Research } from "@/types/database";
 
 interface ResearchCardProps {
   research: Research;
   onPin?: (item: { type: "research"; id: string; title: string; url: string }) => void;
   isPinned?: boolean;
+  onDismiss?: (itemType: "research", itemId: string) => void;
 }
 
-export function ResearchCard({ research, onPin, isPinned }: ResearchCardProps) {
+export function ResearchCard({ research, onPin, isPinned, onDismiss }: ResearchCardProps) {
   return (
     <article className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <div className="flex items-start justify-between gap-2">
@@ -34,19 +36,30 @@ export function ResearchCard({ research, onPin, isPinned }: ResearchCardProps) {
                 {tag}
               </span>
             ))}
-            <span className="text-xs text-neutral-400">Score: {research.relevance_score}</span>
           </div>
         </div>
-        {onPin && (
-          <button
-            type="button"
-            onClick={() => onPin({ type: "research", id: research.id, title: research.title, url: research.url })}
-            className="shrink-0 rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-            title={isPinned ? "Pinned" : "Pin"}
-          >
-            <PinIcon pinned={isPinned} size={18} />
-          </button>
-        )}
+        <div className="flex shrink-0 gap-1">
+          {onPin && (
+            <button
+              type="button"
+              onClick={() => onPin({ type: "research", id: research.id, title: research.title, url: research.url })}
+              className="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              title={isPinned ? "Pinned" : "Pin"}
+            >
+              <PinIcon pinned={isPinned} size={18} />
+            </button>
+          )}
+          {onDismiss && (
+            <button
+              type="button"
+              onClick={() => onDismiss("research", research.id)}
+              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+              title="Remove from view"
+            >
+              <RemoveIcon size={18} />
+            </button>
+          )}
+        </div>
       </div>
     </article>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { PinIcon } from "./PinIcon";
+import { RemoveIcon } from "./RemoveIcon";
 import type { Startup } from "@/types/database";
 
 interface FeaturedStartupCardProps {
@@ -10,9 +11,10 @@ interface FeaturedStartupCardProps {
   starredStartups?: { id: string; name: string }[];
   onPin?: (item: { type: "startup"; id: string; title: string; url: string }) => void;
   isPinned?: boolean;
+  onDismiss?: (itemType: "startup", itemId: string) => void;
 }
 
-export function FeaturedStartupCard({ startup, onStar, onUnstar, starredStartups = [], onPin, isPinned }: FeaturedStartupCardProps) {
+export function FeaturedStartupCard({ startup, onStar, onUnstar, starredStartups = [], onPin, isPinned, onDismiss }: FeaturedStartupCardProps) {
   const starred = starredStartups.find((s) => s.name.toLowerCase() === startup.name.toLowerCase());
   const isStarred = !!starred;
 
@@ -36,9 +38,6 @@ export function FeaturedStartupCard({ startup, onStar, onUnstar, starredStartups
           >
             {startup.name}
           </a>
-          {(startup.overall_score != null && startup.overall_score > 0) && (
-            <span className="ml-2 text-xs text-neutral-400">Score: {startup.overall_score}</span>
-          )}
           {startup.founding_team && (
             <p className="mt-1 text-sm text-neutral-600 dark:text-neutral-400">
               Founding team: {startup.founding_team}
@@ -112,6 +111,16 @@ export function FeaturedStartupCard({ startup, onStar, onUnstar, starredStartups
               title={isPinned ? "Pinned" : "Pin"}
             >
               <PinIcon pinned={isPinned} size={18} />
+            </button>
+          )}
+          {onDismiss && (
+            <button
+              type="button"
+              onClick={() => onDismiss("startup", startup.id)}
+              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+              title="Remove from view"
+            >
+              <RemoveIcon size={18} />
             </button>
           )}
         </div>

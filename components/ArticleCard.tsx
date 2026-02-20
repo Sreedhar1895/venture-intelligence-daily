@@ -1,6 +1,7 @@
 "use client";
 
 import { PinIcon } from "./PinIcon";
+import { RemoveIcon } from "./RemoveIcon";
 import type { Article } from "@/types/database";
 
 interface ArticleCardProps {
@@ -10,9 +11,10 @@ interface ArticleCardProps {
   starredStartups?: { id: string; name: string }[];
   onPin?: (item: { type: "article"; id: string; title: string; url: string }) => void;
   isPinned?: boolean;
+  onDismiss?: (itemType: "article", itemId: string) => void;
 }
 
-export function ArticleCard({ article, onStar, onUnstar, onPin, starredStartups = [], isPinned }: ArticleCardProps) {
+export function ArticleCard({ article, onStar, onUnstar, onPin, onDismiss, starredStartups = [], isPinned }: ArticleCardProps) {
   const name = article.related_tracked_startup || extractStartupName(article.title);
   const starred = name ? starredStartups.find((s) => s.name.toLowerCase() === name.toLowerCase()) : null;
   const isStarred = !!starred;
@@ -60,7 +62,6 @@ export function ArticleCard({ article, onStar, onUnstar, onPin, starredStartups 
                 {article.stage.replace(/_/g, " ")}
               </span>
             )}
-            <span className="text-xs text-neutral-400">Score: {article.relevance_score}</span>
           </div>
         </div>
         <div className="flex shrink-0 gap-1">
@@ -82,6 +83,16 @@ export function ArticleCard({ article, onStar, onUnstar, onPin, starredStartups 
               title={isPinned ? "Pinned" : "Pin"}
             >
               <PinIcon pinned={isPinned} size={18} />
+            </button>
+          )}
+          {onDismiss && (
+            <button
+              type="button"
+              onClick={() => onDismiss("article", article.id)}
+              className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+              title="Remove from view"
+            >
+              <RemoveIcon size={18} />
             </button>
           )}
         </div>
