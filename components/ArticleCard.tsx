@@ -1,14 +1,17 @@
 "use client";
 
+import { PinIcon } from "./PinIcon";
 import type { Article } from "@/types/database";
 
 interface ArticleCardProps {
   article: Article;
   onStar?: (startupName: string) => void;
+  onPin?: (item: { type: "article"; id: string; title: string; url: string }) => void;
   starredStartups?: string[];
+  isPinned?: boolean;
 }
 
-export function ArticleCard({ article, onStar, starredStartups = [] }: ArticleCardProps) {
+export function ArticleCard({ article, onStar, onPin, starredStartups = [], isPinned }: ArticleCardProps) {
   const name = article.related_tracked_startup || extractStartupName(article.title);
   const isStarred = name ? starredStartups.some((s) => s.toLowerCase() === name.toLowerCase()) : false;
 
@@ -44,19 +47,36 @@ export function ArticleCard({ article, onStar, starredStartups = [] }: ArticleCa
                 {article.event_type}
               </span>
             )}
+            {article.stage && (
+              <span className="rounded bg-amber-100 px-2 py-0.5 text-xs dark:bg-amber-900/30">
+                {article.stage.replace(/_/g, " ")}
+              </span>
+            )}
             <span className="text-xs text-neutral-400">Score: {article.relevance_score}</span>
           </div>
         </div>
-        {name && onStar && (
-          <button
-            type="button"
-            onClick={() => onStar(name)}
-            className="shrink-0 rounded p-1.5 text-lg hover:bg-neutral-100 dark:hover:bg-neutral-800"
-            title={isStarred ? "Starred" : "Star startup"}
-          >
-            {isStarred ? "★" : "☆"}
-          </button>
-        )}
+        <div className="flex shrink-0 gap-1">
+          {name && onStar && (
+            <button
+              type="button"
+              onClick={() => onStar(name)}
+              className="rounded p-1.5 text-lg hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              title={isStarred ? "Starred" : "Star startup"}
+            >
+              {isStarred ? "★" : "☆"}
+            </button>
+          )}
+          {onPin && (
+            <button
+              type="button"
+              onClick={() => onPin({ type: "article", id: article.id, title: article.title, url: article.url })}
+              className="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              title={isPinned ? "Pinned" : "Pin"}
+            >
+              <PinIcon pinned={isPinned} size={18} />
+            </button>
+          )}
+        </div>
       </div>
     </article>
   );

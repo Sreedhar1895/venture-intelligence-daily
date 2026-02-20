@@ -4,28 +4,46 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { ArticleCard } from "./ArticleCard";
 import { EventsList } from "./EventsList";
+import { ResearchCard } from "./ResearchCard";
+import { FeaturedStartupCard } from "./FeaturedStartupCard";
 import { useTheme } from "./ThemeProvider";
-import type { Article } from "@/types/database";
+import type { Article, Research, Startup, PinnedItem } from "@/types/database";
 
 const SECTOR_FILTERS = ["All", "AI-native", "Fintech", "Robotics", "Vertical SaaS", "Other"];
+const STAGE_FILTERS = [
+  { value: "", label: "All stages" },
+  { value: "early_stage", label: "Early stage" },
+  { value: "growth_late_stage", label: "Growth / Late stage" },
+  { value: "public_pe", label: "Public / PE" },
+];
 
 const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001";
+
+type TabType = "signals" | "research" | "startups" | "tracked" | "pinned";
 
 export function Dashboard() {
   const { theme, toggle } = useTheme();
   const [articles, setArticles] = useState<Article[]>([]);
+  const [research, setResearch] = useState<Research[]>([]);
+  const [featuredStartups, setFeaturedStartups] = useState<Startup[]>([]);
+  const [pins, setPins] = useState<PinnedItem[]>([]);
   const [updates, setUpdates] = useState<unknown[]>([]);
   const [starredNames, setStarredNames] = useState<string[]>([]);
   const [sector, setSector] = useState("All");
-  const [tab, setTab] = useState<"signals" | "tracked">("signals");
+  const [stage, setStage] = useState("");
+  const [tab, setTab] = useState<TabType>("signals");
   const [loading, setLoading] = useState(true);
   const [articlesError, setArticlesError] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
     async function load() {
       setArticlesError(null);
-      const res = await fetch("/api/articles");
+      const stageParam = stage ? `?stage=${stage}` : "";
+      const res = await fetch(`/api/articles${stageParam}`);
       const json = await res.json();
+      if (cancelled) return;
       if (json.error) {
         setArticlesError(json.error);
         setArticles([]);
@@ -34,6 +52,19 @@ export function Dashboard() {
         setArticles(arts as Article[]);
       }
 
+      const sectorParam = sector !== "All" ? `?sector=${encodeURIComponent(sector)}` : "";
+      const resResearch = await fetch(`/api/research${sectorParam}`);
+      const jsonResearch = await resResearch.json();
+      if (!cancelled) setResearch(Array.isArray(jsonResearch.research) ? (jsonResearch.research as Research[]) : []);
+
+      const resStartups = await fetch("/api/startups/featured");
+      const jsonStartups = await resStartups.json();
+      if (!cancelled) setFeaturedStartups(Array.isArray(jsonStartups.startups) ? (jsonStartups.startups as Startup[]) : []);
+
+      const resPins = await fetch(`/api/pins?userId=${DEMO_USER_ID}`);
+      const jsonPins = await resPins.json();
+      if (!cancelled) setPins(Array.isArray(jsonPins.pins) ? (jsonPins.pins as PinnedItem[]) : []);
+
       const { data: starData } = await supabase
         .from("starred_startups")
         .select("startups(name)")
@@ -41,21 +72,46 @@ export function Dashboard() {
       const names = (starData || [])
         .map((s) => (s as { startups: { name: string } | null }).startups?.name)
         .filter(Boolean) as string[];
-      setStarredNames(names);
+      if (!cancelled) setStarredNames(names);
 
       const updatesRes = await fetch(`/api/tracked-updates?userId=${DEMO_USER_ID}`);
       const updatesJson = await updatesRes.json();
-      setUpdates(updatesJson.updates || []);
+      if (!cancelled) setUpdates(updatesJson.updates || []);
 
-      setLoading(false);
+      if (!cancelled) setLoading(false);
     }
     load();
-  }, []);
+    return () => { cancelled = true; };
+  }, [stage, sector]);
 
   const filtered =
     sector === "All"
       ? articles
       : articles.filter((a) => a.sector_tags?.includes(sector as never));
+
+  const pinnedSet = new Set(pins.map((p) => `${p.item_type}:${p.item_id}`));
+  const isPinned = (type: string, id: string) => pinnedSet.has(`${type}:${id}`);
+
+  const handlePin = async (item: { type: string; id: string; title: string; url: string }) => {
+    const res = await fetch("/api/pins", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: DEMO_USER_ID,
+        itemType: item.type,
+        itemId: item.id,
+        itemTitle: item.title,
+        itemUrl: item.url,
+      }),
+    });
+    const json = await res.json();
+    if (json.pin) setPins((prev) => [...prev.filter((p) => !(p.item_type === item.type && p.item_id === item.id)), json.pin]);
+  };
+
+  const handleUnpin = async (itemType: string, itemId: string) => {
+    await fetch(`/api/pins?userId=${DEMO_USER_ID}&itemType=${itemType}&itemId=${itemId}`, { method: "DELETE" });
+    setPins((prev) => prev.filter((p) => !(p.item_type === itemType && p.item_id === itemId)));
+  };
 
   const handleStar = async (startupName: string) => {
     await fetch("/api/star", {
@@ -92,21 +148,30 @@ export function Dashboard() {
 
       <div className="mt-6 flex gap-6">
         <aside className="w-64 shrink-0">
-          <EventsList />
+          <EventsList
+            onPin={handlePin}
+            pinnedEventIds={new Set(pins.filter((p) => p.item_type === "event").map((p) => p.item_id))}
+          />
         </aside>
 
         <div className="min-w-0 flex-1">
-          <div className="mb-4 flex gap-2">
-            {(["signals", "tracked"] as const).map((t) => (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {([
+              { id: "signals" as TabType, label: "Top Signals" },
+              { id: "research" as TabType, label: "Research" },
+              { id: "startups" as TabType, label: "Startups to Watch" },
+              { id: "tracked" as TabType, label: "Tracked Startups" },
+              { id: "pinned" as TabType, label: "Pinned" },
+            ]).map(({ id, label }) => (
               <button
-                key={t}
+                key={id}
                 type="button"
-                onClick={() => setTab(t)}
+                onClick={() => setTab(id)}
                 className={`rounded-lg px-4 py-2 text-sm font-medium ${
-                  tab === t ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900" : "bg-neutral-100 dark:bg-neutral-800"
+                  tab === id ? "bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900" : "bg-neutral-100 dark:bg-neutral-800"
                 }`}
               >
-                {t === "signals" ? "Top Signals" : "Tracked Startups"}
+                {label}
               </button>
             ))}
           </div>
@@ -114,6 +179,7 @@ export function Dashboard() {
           {tab === "signals" && (
             <>
               <div className="mb-4 flex flex-wrap gap-2">
+                <span className="mr-2 self-center text-sm text-neutral-500">Sector:</span>
                 {SECTOR_FILTERS.map((s) => (
                   <button
                     key={s}
@@ -127,6 +193,21 @@ export function Dashboard() {
                   </button>
                 ))}
               </div>
+              <div className="mb-4 flex flex-wrap gap-2">
+                <span className="mr-2 self-center text-sm text-neutral-500">Stage:</span>
+                {STAGE_FILTERS.map(({ value, label }) => (
+                  <button
+                    key={value || "all"}
+                    type="button"
+                    onClick={() => setStage(value)}
+                    className={`rounded px-3 py-1 text-sm ${
+                      stage === value ? "bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900" : "bg-neutral-100 dark:bg-neutral-800"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
 
               {loading ? (
                 <p className="text-neutral-500">Loading...</p>
@@ -137,7 +218,9 @@ export function Dashboard() {
                       key={article.id}
                       article={article}
                       onStar={handleStar}
+                      onPin={handlePin}
                       starredStartups={starredNames}
+                      isPinned={isPinned("article", article.id)}
                     />
                   ))}
                   {filtered.length === 0 && (
@@ -150,6 +233,101 @@ export function Dashboard() {
                 </div>
               )}
             </>
+          )}
+
+          {tab === "research" && (
+            <>
+              <div className="mb-4 flex flex-wrap gap-2">
+                <span className="mr-2 self-center text-sm text-neutral-500">Sector:</span>
+                {SECTOR_FILTERS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSector(s)}
+                    className={`rounded px-3 py-1 text-sm ${
+                      sector === s ? "bg-neutral-800 text-white dark:bg-neutral-200 dark:text-neutral-900" : "bg-neutral-100 dark:bg-neutral-800"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+              {loading ? (
+                <p className="text-neutral-500">Loading...</p>
+              ) : (
+                <div className="space-y-4">
+                  {research.map((r) => (
+                    <ResearchCard
+                      key={r.id}
+                      research={r}
+                      onPin={handlePin}
+                      isPinned={isPinned("research", r.id)}
+                    />
+                  ))}
+                  {research.length === 0 && (
+                    <p className="text-neutral-500">No research yet. Add research sources or run research ingest.</p>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+
+          {tab === "startups" && (
+            loading ? (
+              <p className="text-neutral-500">Loading...</p>
+            ) : (
+              <div className="space-y-4">
+                {featuredStartups.map((s) => (
+                  <FeaturedStartupCard
+                    key={s.id}
+                    startup={s}
+                    onStar={handleStar}
+                    onPin={handlePin}
+                    isStarred={starredNames.some((n) => n.toLowerCase() === s.name.toLowerCase())}
+                    isPinned={isPinned("startup", s.id)}
+                  />
+                ))}
+                {featuredStartups.length === 0 && (
+                  <p className="text-neutral-500">
+                    No startups to watch yet. Run ingestion to discover startups from news. Startups are scored by: vertical (1), new customers/partnerships (5), accelerator/funding (4), key hires (2), research (3). Only those with score &gt; 0 appear here.
+                  </p>
+                )}
+              </div>
+            )
+          )}
+
+          {tab === "pinned" && (
+            <div className="space-y-4">
+              {pins.length === 0 ? (
+                <p className="text-neutral-500">No pinned items. Pin news, research, events, or startups from other tabs.</p>
+              ) : (
+                pins.map((pin) => (
+                  <div
+                    key={pin.id}
+                    className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900"
+                  >
+                    <div>
+                      <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs dark:bg-neutral-800">{pin.item_type}</span>
+                      <a
+                        href={pin.item_url || "#"}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-2 font-medium hover:underline"
+                      >
+                        {pin.item_title || pin.item_id}
+                      </a>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleUnpin(pin.item_type, pin.item_id)}
+                      className="rounded px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+                    >
+                      Unpin
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
           )}
 
           {tab === "tracked" && (

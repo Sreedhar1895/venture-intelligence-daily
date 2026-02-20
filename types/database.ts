@@ -12,6 +12,8 @@ export type EventType =
   | "Event"
   | "General News";
 
+export type StageFilter = "early_stage" | "growth_late_stage" | "public_pe";
+
 export interface Article {
   id: string;
   title: string;
@@ -25,7 +27,27 @@ export interface Article {
   strategic_note: string | null;
   relevance_score: number;
   related_tracked_startup: string | null;
+  stage: StageFilter | null;
   created_at: string;
+}
+
+export interface Research {
+  id: string;
+  title: string;
+  source: string;
+  url: string;
+  abstract: string | null;
+  sector_tags: SectorTag[];
+  published_at: string | null;
+  summary: string | null;
+  relevance_score: number;
+  created_at: string;
+}
+
+export interface StartupSignals {
+  signed_customers?: boolean;
+  team_grew?: boolean;
+  raised_funding?: boolean;
 }
 
 export interface Startup {
@@ -33,6 +55,25 @@ export interface Startup {
   name: string;
   website: string | null;
   sector_tags: SectorTag[];
+  founding_team: string | null;
+  why_interesting: string | null;
+  featured: boolean;
+  links: { label: string; url: string }[];
+  relevance_score?: number;
+  overall_score?: number;
+  moat_note?: string | null;
+  signals?: StartupSignals;
+  created_at: string;
+}
+
+export interface PinnedItem {
+  id: string;
+  user_id: string;
+  item_type: "article" | "event" | "research" | "startup";
+  item_id: string;
+  item_title: string | null;
+  item_url: string | null;
+  item_meta: Record<string, unknown>;
   created_at: string;
 }
 
@@ -70,4 +111,5 @@ export interface ClaudeClassification {
   summary: string;
   strategic_note: string;
   relevance_score: number;
+  stage: StageFilter;
 }
