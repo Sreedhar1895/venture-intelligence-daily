@@ -2,6 +2,14 @@ import Anthropic from "@anthropic-ai/sdk";
 
 const SECTOR_OPTIONS = ["Vertical SaaS", "AI-native", "Fintech", "Robotics"] as const;
 
+export const ACCELERATOR_VALUES = ["YC", "SPC", "Neo", "Techstars", "500 Global"] as const;
+export const UNIVERSITY_VALUES = ["CMU", "MIT", "Stanford", "Berkeley", "Harvard", "Other"] as const;
+
+export interface CofounderLinkedIn {
+  name: string;
+  url: string;
+}
+
 export interface ExtractedStartup {
   name: string;
   why_interesting: string;
@@ -11,6 +19,9 @@ export interface ExtractedStartup {
   signed_customers: boolean;
   team_grew: boolean;
   raised_funding: boolean;
+  accelerator: typeof ACCELERATOR_VALUES[number] | null;
+  university: typeof UNIVERSITY_VALUES[number] | null;
+  cofounder_linkedins?: CofounderLinkedIn[];
 }
 
 const SYSTEM_PROMPT = `You extract startups/companies that are "potentially interesting to track" from venture and tech news.
@@ -18,16 +29,19 @@ const SYSTEM_PROMPT = `You extract startups/companies that are "potentially inte
 Given an article title and content snippet, output a JSON array of objects. Each object has:
 - name: the company/startup name (exact, as it appears or commonly known)
 - why_interesting: one short sentence on why they're notable
-- sector_relevance: array of sectors that apply from: "Vertical SaaS", "AI-native", "Fintech", "Robotics" (use only these exact strings; empty [] if none)
-- relevance_score: integer 1-10 for how relevant this startup is to Vertical SaaS, AI-native, Fintech, or Robotics (10 = highly relevant)
-- moat_note: short note on any interesting moat (IP, distribution, network effects, data, etc.) or null if not mentioned
-- signed_customers: true if the article says they signed new customers, landed deals, or similar
-- team_grew: true if the article says they hired, expanded team, or key hire
-- raised_funding: true if the article is about them raising funding (any round)
+- sector_relevance: array of sectors from: "Vertical SaaS", "AI-native", "Fintech", "Robotics" (use only these; empty [] if none)
+- relevance_score: integer 1-10 (10 = highly relevant)
+- moat_note: short note on moat (IP, distribution, network effects, data) or null
+- signed_customers: true if they signed new customers, landed deals
+- team_grew: true if they hired, expanded team
+- raised_funding: true if article is about them raising funding
+- accelerator: if backed by Y Combinator use "YC", South Park Commons "SPC", Neo "Neo", Techstars "Techstars", 500 Global "500 Global"; else null
+- university: if spinoff/affiliated with Carnegie Mellon "CMU", MIT "MIT", Stanford "Stanford", Berkeley "Berkeley", Harvard "Harvard", or another university "Other"; else null
+- cofounder_linkedins: optional array of { "name": "Person Name", "url": "https://www.linkedin.com/in/..." } for founders/cofounders mentioned in the article when their LinkedIn profile URL is explicitly given. Use empty [] or omit if no LinkedIn URLs are in the text.
 
-Only include startups or growth companies that are clearly the subject of the article. Skip big tech (e.g. Google, Meta) unless about a startup acquisition. Prefer early-stage and venture-backed companies.
+Only include startups clearly the subject of the article. Skip big tech unless startup acquisition.
 
-Return valid JSON only: an array of objects with those keys. If no relevant startup is found, return [].`;
+Return valid JSON only: an array of objects with those keys. If none found, return [].`;
 
 export async function extractStartupsFromArticle(
   title: string,
@@ -65,6 +79,8 @@ export async function extractStartupsFromArticle(
         const score = typeof (x as { relevance_score?: unknown }).relevance_score === "number"
           ? Math.min(10, Math.max(1, Math.round((x as { relevance_score: number }).relevance_score)))
           : 5;
+        const acc = (x as { accelerator?: string }).accelerator;
+        const uni = (x as { university?: string }).university;
         return {
           name,
           why_interesting: String((x as { why_interesting?: string }).why_interesting ?? "").trim(),
@@ -76,6 +92,16 @@ export async function extractStartupsFromArticle(
           signed_customers: Boolean((x as { signed_customers?: boolean }).signed_customers),
           team_grew: Boolean((x as { team_grew?: boolean }).team_grew),
           raised_funding: Boolean((x as { raised_funding?: boolean }).raised_funding),
+          accelerator: acc && ACCELERATOR_VALUES.includes(acc as never) ? (acc as typeof ACCELERATOR_VALUES[number]) : null,
+          university: uni && UNIVERSITY_VALUES.includes(uni as never) ? (uni as typeof UNIVERSITY_VALUES[number]) : null,
+          cofounder_linkedins: (() => {
+            const arr = (x as { cofounder_linkedins?: unknown }).cofounder_linkedins;
+            if (!Array.isArray(arr)) return undefined;
+            return arr
+              .filter((c): c is { name?: unknown; url?: unknown } => c && typeof c === "object")
+              .map((c) => ({ name: String(c.name ?? "").trim(), url: String(c.url ?? "").trim() }))
+              .filter((c) => c.name && c.url && c.url.toLowerCase().includes("linkedin.com"));
+          })(),
         };
       })
       .filter((x): x is ExtractedStartup => x !== null);

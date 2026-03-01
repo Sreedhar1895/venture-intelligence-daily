@@ -18,22 +18,27 @@ interface VentureEvent {
 
 interface EventsListProps {
   onPin?: (item: { type: "event"; id: string; title: string; url: string }) => void;
+  onUnpin?: (itemType: string, itemId: string) => void;
   pinnedEventIds?: Set<string>;
   dismissedEventIds?: Set<string>;
   onDismiss?: (itemType: "event", itemId: string) => void;
+  timeRange?: string;
 }
 
-export function EventsList({ onPin, pinnedEventIds, dismissedEventIds, onDismiss }: EventsListProps) {
+export function EventsList({ onPin, onUnpin, pinnedEventIds, dismissedEventIds, onDismiss, timeRange }: EventsListProps) {
   const [city, setCity] = useState("All");
   const [events, setEvents] = useState<VentureEvent[]>([]);
 
   useEffect(() => {
-    const qs = city === "All" ? "" : `?city=${encodeURIComponent(city)}`;
+    const params = new URLSearchParams();
+    if (city !== "All") params.set("city", city);
+    if (timeRange) params.set("timeRange", timeRange);
+    const qs = params.toString() ? `?${params}` : "";
     fetch(`/api/events${qs}`)
       .then((r) => r.json())
       .then((data) => setEvents(data.events ?? []))
       .catch(() => setEvents([]));
-  }, [city]);
+  }, [city, timeRange]);
 
   return (
     <div className="rounded-lg border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
@@ -76,12 +81,16 @@ export function EventsList({ onPin, pinnedEventIds, dismissedEventIds, onDismiss
                     <span className="font-medium">{e.title}</span>
                   )}
                   <div className="flex shrink-0 gap-1">
-                    {onPin && (
+                    {(onPin || onUnpin) && (
                       <button
                         type="button"
-                        onClick={() => onPin({ type: "event", id: e.id, title: e.title, url: e.registration_url || e.url || "#" })}
+                        onClick={() => {
+                          const pinned = pinnedEventIds?.has(e.id);
+                          if (pinned && onUnpin) onUnpin("event", e.id);
+                          else if (!pinned && onPin) onPin({ type: "event", id: e.id, title: e.title, url: e.registration_url || e.url || "#" });
+                        }}
                         className="rounded p-1 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                        title={pinnedEventIds?.has(e.id) ? "Pinned" : "Pin"}
+                        title={pinnedEventIds?.has(e.id) ? "Unpin" : "Pin"}
                       >
                         <PinIcon pinned={pinnedEventIds?.has(e.id)} size={16} />
                       </button>

@@ -9,18 +9,20 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabaseAdmin
       .from("starred_startups")
-      .select("startup_id, startups(name)")
+      .select("startup_id, startups(name, cofounder_linkedins)")
       .eq("user_id", userId);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
     const starred = (data || [])
       .map((s) => {
-        const name = (s as { startups: { name: string } | null }).startups?.name;
+        const startups = (s as { startups: { name: string; cofounder_linkedins?: { name: string; url: string }[] } | null }).startups;
+        const name = startups?.name;
         const id = (s as { startup_id: string }).startup_id;
-        return name && id ? { id, name } : null;
+        const cofounder_linkedins = Array.isArray(startups?.cofounder_linkedins) ? startups.cofounder_linkedins : undefined;
+        return name && id ? { id, name, cofounder_linkedins } : null;
       })
-      .filter((x): x is { id: string; name: string } => x != null);
+      .filter((x): x is { id: string; name: string; cofounder_linkedins?: { name: string; url: string }[] } => x != null);
 
     return NextResponse.json({ starred });
   } catch (e) {

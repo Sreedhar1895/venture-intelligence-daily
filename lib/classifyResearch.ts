@@ -36,7 +36,23 @@ export async function classifyResearch(
   const block = response.content.find((b) => b.type === "text");
   if (!block || block.type !== "text") throw new Error("No text in response");
 
-  const raw = block.text.trim().replace(/^```json\s*/i, "").replace(/\s*```$/i, "");
+  let raw = block.text.trim().replace(/^```json\s*/i, "").replace(/\s*```$/i, "").trim();
+  const firstBrace = raw.indexOf("{");
+  if (firstBrace >= 0) {
+    let depth = 0;
+    let end = -1;
+    for (let i = firstBrace; i < raw.length; i++) {
+      if (raw[i] === "{") depth++;
+      else if (raw[i] === "}") {
+        depth--;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    if (end >= 0) raw = raw.slice(firstBrace, end + 1);
+  }
   const parsed = JSON.parse(raw) as {
     sector_tags: string[];
     summary: string;

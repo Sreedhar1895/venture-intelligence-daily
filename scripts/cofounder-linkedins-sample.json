@@ -1,0 +1,17 @@
+{
+  "updates": [
+    {
+      "startup_name": "Acme AI",
+      "cofounder_linkedins": [
+        { "name": "Jane Doe", "url": "https://www.linkedin.com/in/janedoe" },
+        { "name": "John Smith", "url": "https://www.linkedin.com/in/johnsmith" }
+      ]
+    },
+    {
+      "startup_id": "00000000-0000-0000-0000-000000000000",
+      "cofounder_linkedins": [
+        { "name": "Founder Name", "url": "https://www.linkedin.com/in/foundername" }
+      ]
+    }
+  ]
+}

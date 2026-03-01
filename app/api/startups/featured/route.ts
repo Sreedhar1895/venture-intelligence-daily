@@ -1,14 +1,31 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const { data, error } = await supabaseAdmin
+    const { searchParams } = new URL(request.url);
+    const sector = searchParams.get("sector");
+    const accelerator = searchParams.get("accelerator");
+    const university = searchParams.get("university");
+    const view = searchParams.get("view") || "news"; // news | accelerators | academic
+    let query = supabaseAdmin
       .from("startups")
       .select("*")
       .eq("featured", true)
       .order("overall_score", { ascending: false, nullsFirst: false })
-      .limit(50);
+      .limit(100);
+    if (sector && sector !== "All") {
+      query = query.contains("sector_tags", [sector]);
+    }
+    if (view === "accelerators") {
+      if (accelerator) query = query.eq("accelerator", accelerator);
+      else query = query.not("accelerator", "is", null);
+    }
+    if (view === "academic") {
+      if (university) query = query.eq("university", university);
+      else query = query.not("university", "is", null);
+    }
+    const { data, error } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     const startups = (data ?? []).map((s) => ({
       ...s,

@@ -82,31 +82,50 @@ export async function POST() {
           };
           const { data: existing } = await supabase
             .from("startups")
-            .select("id, links, overall_score, moat_note, signals")
+            .select("id, links, overall_score, moat_note, signals, accelerator, university, cofounder_linkedins")
             .ilike("name", trimmedName)
             .limit(1)
             .maybeSingle();
           const newOverall = (existing?.overall_score ?? 0) + points;
+          const mergeCofounders = (
+            prev: { name: string; url: string }[] | null,
+            next: { name: string; url: string }[] | undefined
+          ) => {
+            const seen = new Set((prev ?? []).map((c) => c.url));
+            const out = [...(prev ?? [])];
+            for (const c of next ?? []) {
+              if (c.url && !seen.has(c.url)) {
+                seen.add(c.url);
+                out.push(c);
+              }
+            }
+            return out.length ? out : undefined;
+          };
+          const cofounderLinkedIns = mergeCofounders(
+            (existing as { cofounder_linkedins?: { name: string; url: string }[] } | null)?.cofounder_linkedins ?? null,
+            s.cofounder_linkedins
+          );
           if (existing) {
             const links = Array.isArray(existing.links) ? existing.links : [];
             const hasLink = links.some((l: { url?: string }) => l.url === item.link);
             const existingSignals = (existing.signals as Record<string, boolean>) || {};
-            await supabase
-              .from("startups")
-              .update({
-                why_interesting: s.why_interesting || (existing as { why_interesting?: string }).why_interesting,
-                featured: newOverall > 0,
-                sector_tags: sectorTags,
-                overall_score: newOverall,
-                moat_note: s.moat_note || (existing.moat_note as string) || null,
-                signals: {
-                  signed_customers: existingSignals.signed_customers || s.signed_customers,
-                  team_grew: existingSignals.team_grew || s.team_grew,
-                  raised_funding: existingSignals.raised_funding || s.raised_funding,
-                },
-                links: hasLink ? links : [...links, sourceLink],
-              })
-              .eq("id", existing.id);
+            const updatePayload: Record<string, unknown> = {
+              why_interesting: s.why_interesting || (existing as { why_interesting?: string }).why_interesting,
+              featured: newOverall > 0,
+              sector_tags: sectorTags,
+              overall_score: newOverall,
+              moat_note: s.moat_note || (existing.moat_note as string) || null,
+              accelerator: s.accelerator || (existing as { accelerator?: string }).accelerator || null,
+              university: s.university || (existing as { university?: string }).university || null,
+              signals: {
+                signed_customers: existingSignals.signed_customers || s.signed_customers,
+                team_grew: existingSignals.team_grew || s.team_grew,
+                raised_funding: existingSignals.raised_funding || s.raised_funding,
+              },
+              links: hasLink ? links : [...links, sourceLink],
+            };
+            if (cofounderLinkedIns !== undefined) updatePayload.cofounder_linkedins = cofounderLinkedIns;
+            await supabase.from("startups").update(updatePayload).eq("id", existing.id);
           } else {
             await supabase.from("startups").insert({
               name: trimmedName,
@@ -117,8 +136,11 @@ export async function POST() {
               featured: newOverall > 0,
               overall_score: newOverall,
               moat_note: s.moat_note,
+              accelerator: s.accelerator || null,
+              university: s.university || null,
               signals,
               links: [sourceLink],
+              cofounder_linkedins: cofounderLinkedIns ?? [],
             });
           }
         }

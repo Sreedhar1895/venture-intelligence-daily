@@ -7,11 +7,12 @@ import type { Research } from "@/types/database";
 interface ResearchCardProps {
   research: Research;
   onPin?: (item: { type: "research"; id: string; title: string; url: string }) => void;
+  onUnpin?: (itemType: string, itemId: string) => void;
   isPinned?: boolean;
   onDismiss?: (itemType: "research", itemId: string) => void;
 }
 
-export function ResearchCard({ research, onPin, isPinned, onDismiss }: ResearchCardProps) {
+export function ResearchCard({ research, onPin, onUnpin, isPinned, onDismiss }: ResearchCardProps) {
   return (
     <article className="rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
       <div className="flex items-start justify-between gap-2">
@@ -39,12 +40,12 @@ export function ResearchCard({ research, onPin, isPinned, onDismiss }: ResearchC
           </div>
         </div>
         <div className="flex shrink-0 gap-1">
-          {onPin && (
+          {(onPin || onUnpin) && (
             <button
               type="button"
-              onClick={() => onPin({ type: "research", id: research.id, title: research.title, url: research.url })}
+              onClick={() => (isPinned && onUnpin ? onUnpin("research", research.id) : onPin?.({ type: "research", id: research.id, title: research.title, url: research.url }))}
               className="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-              title={isPinned ? "Pinned" : "Pin"}
+              title={isPinned ? "Unpin" : "Pin"}
             >
               <PinIcon pinned={isPinned} size={18} />
             </button>

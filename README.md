@@ -38,6 +38,27 @@ Internal venture intelligence for AI-native, Vertical SaaS, Fintech, and Robotic
 
    Open [http://localhost:3000](http://localhost:3000).
 
+## Backfilling cofounder_linkedins
+
+To populate `cofounder_linkedins` for startups, call the backfill API with a JSON body:
+
+```bash
+curl -X POST http://localhost:3000/api/ingest/backfill-cofounder-linkedins \
+  -H "Content-Type: application/json" \
+  -d @scripts/cofounder-linkedins-sample.json
+```
+
+Or with a secret (if `BACKFILL_SECRET` is set in env):
+
+```bash
+curl -X POST http://localhost:3000/api/ingest/backfill-cofounder-linkedins \
+  -H "Content-Type: application/json" \
+  -H "x-backfill-secret: YOUR_SECRET" \
+  -d @scripts/cofounder-linkedins-sample.json
+```
+
+Body shape: `{ "updates": [ { "startup_id": "uuid" } or { "startup_name": "Exact Name" }, "cofounder_linkedins": [ { "name": "Full Name", "url": "https://linkedin.com/in/..." } ] } ] }`. Use either `startup_id` or `startup_name` (matched case-insensitively). See `scripts/cofounder-linkedins-sample.json` for an example.
+
 ## API Routes
 
 - `POST /api/ingest` – fetch RSS, classify with Claude, insert articles (call from cron or manually).

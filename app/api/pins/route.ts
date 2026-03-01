@@ -12,7 +12,24 @@ export async function GET(request: Request) {
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ pins: data ?? [] });
+    const pins = data ?? [];
+    const startupPinIds = pins.filter((p) => p.item_type === "startup").map((p) => p.item_id);
+    let startupCofounders: Record<string, { name: string; url: string }[]> = {};
+    if (startupPinIds.length > 0) {
+      const { data: startupRows } = await supabaseAdmin
+        .from("startups")
+        .select("id, cofounder_linkedins")
+        .in("id", startupPinIds);
+      for (const row of startupRows ?? []) {
+        startupCofounders[row.id] = Array.isArray(row.cofounder_linkedins) ? row.cofounder_linkedins : [];
+      }
+    }
+    const pinsWithCofounders = pins.map((p) =>
+      p.item_type === "startup" && startupCofounders[p.item_id]
+        ? { ...p, cofounder_linkedins: startupCofounders[p.item_id] }
+        : p
+    );
+    return NextResponse.json({ pins: pinsWithCofounders });
   } catch (e) {
     console.error("Pins API error:", e);
     return NextResponse.json(

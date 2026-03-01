@@ -75,12 +75,12 @@ export function ArticleCard({ article, onStar, onUnstar, onPin, onDismiss, starr
               {isStarred ? "★" : "☆"}
             </button>
           )}
-          {onPin && (
+          {(onPin || onUnpin) && (
             <button
               type="button"
-              onClick={() => onPin({ type: "article", id: article.id, title: article.title, url: article.url })}
+              onClick={() => (isPinned && onUnpin ? onUnpin("article", article.id) : onPin?.({ type: "article", id: article.id, title: article.title, url: article.url }))}
               className="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-              title={isPinned ? "Pinned" : "Pin"}
+              title={isPinned ? "Unpin" : "Pin"}
             >
               <PinIcon pinned={isPinned} size={18} />
             </button>

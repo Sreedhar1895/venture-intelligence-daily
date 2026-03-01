@@ -80,6 +80,7 @@ export interface Database {
           why_interesting: string | null;
           featured: boolean;
           links: { label: string; url: string }[];
+          cofounder_linkedins: { name: string; url: string }[] | null;
           relevance_score: number;
           overall_score: number;
           moat_note: string | null;
@@ -95,6 +96,7 @@ export interface Database {
           why_interesting?: string | null;
           featured?: boolean;
           links?: { label: string; url: string }[];
+          cofounder_linkedins?: { name: string; url: string }[] | null;
           relevance_score?: number;
           overall_score?: number;
           moat_note?: string | null;

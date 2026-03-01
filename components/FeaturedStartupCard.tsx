@@ -1,6 +1,7 @@
 "use client";
 
 import { PinIcon } from "./PinIcon";
+import { BellIcon } from "./BellIcon";
 import { RemoveIcon } from "./RemoveIcon";
 import type { Startup } from "@/types/database";
 
@@ -10,11 +11,15 @@ interface FeaturedStartupCardProps {
   onUnstar?: (startupId: string) => void;
   starredStartups?: { id: string; name: string }[];
   onPin?: (item: { type: "startup"; id: string; title: string; url: string }) => void;
+  onUnpin?: (itemType: string, itemId: string) => void;
   isPinned?: boolean;
+  onNotify?: (startupId: string, startupName: string) => void;
+  onUnnotify?: (startupId: string) => void;
+  isNotified?: boolean;
   onDismiss?: (itemType: "startup", itemId: string) => void;
 }
 
-export function FeaturedStartupCard({ startup, onStar, onUnstar, starredStartups = [], onPin, isPinned, onDismiss }: FeaturedStartupCardProps) {
+export function FeaturedStartupCard({ startup, onStar, onUnstar, starredStartups = [], onPin, onUnpin, onNotify, onUnnotify, isPinned, isNotified, onDismiss }: FeaturedStartupCardProps) {
   const starred = starredStartups.find((s) => s.name.toLowerCase() === startup.name.toLowerCase());
   const isStarred = !!starred;
 
@@ -43,6 +48,21 @@ export function FeaturedStartupCard({ startup, onStar, onUnstar, starredStartups
               Founding team: {startup.founding_team}
             </p>
           )}
+          {Array.isArray(startup.cofounder_linkedins) && startup.cofounder_linkedins.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-2">
+              {startup.cofounder_linkedins.map((c) => (
+                <a
+                  key={c.url}
+                  href={c.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-600 hover:underline dark:text-blue-400"
+                >
+                  {c.name} (LinkedIn)
+                </a>
+              ))}
+            </div>
+          )}
           {startup.why_interesting && (
             <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
               {startup.why_interesting}
@@ -52,6 +72,25 @@ export function FeaturedStartupCard({ startup, onStar, onUnstar, starredStartups
             <p className="mt-1 text-sm text-neutral-500 dark:text-neutral-500">
               Moat: {startup.moat_note}
             </p>
+          )}
+          {(startup.accelerator || startup.batch || startup.university) && (
+            <div className="mt-1 flex flex-wrap gap-2">
+              {startup.accelerator && startup.batch && (
+                <span className="rounded bg-violet-100 px-2 py-0.5 text-xs dark:bg-violet-900/30">
+                  {startup.accelerator} {startup.batch} · Demo Day
+                </span>
+              )}
+              {startup.accelerator && !startup.batch && (
+                <span className="rounded bg-violet-100 px-2 py-0.5 text-xs dark:bg-violet-900/30">
+                  {startup.accelerator}
+                </span>
+              )}
+              {startup.university && (
+                <span className="rounded bg-slate-100 px-2 py-0.5 text-xs dark:bg-slate-800">
+                  {startup.university}
+                </span>
+              )}
+            </div>
           )}
           {(signals.signed_customers || signals.team_grew || signals.raised_funding) && (
             <div className="mt-2 flex flex-wrap gap-2">
@@ -103,14 +142,24 @@ export function FeaturedStartupCard({ startup, onStar, onUnstar, starredStartups
               {isStarred ? "★" : "☆"}
             </button>
           )}
-          {onPin && (
+          {(onPin || onUnpin) && (
             <button
               type="button"
-              onClick={() => onPin({ type: "startup", id: startup.id, title: startup.name, url: primaryUrl })}
+              onClick={() => (isPinned && onUnpin ? onUnpin("startup", startup.id) : onPin?.({ type: "startup", id: startup.id, title: startup.name, url: primaryUrl }))}
               className="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-              title={isPinned ? "Pinned" : "Pin"}
+              title={isPinned ? "Unpin" : "Pin"}
             >
               <PinIcon pinned={isPinned} size={18} />
+            </button>
+          )}
+          {(onNotify || onUnnotify) && (
+            <button
+              type="button"
+              onClick={() => (isNotified && onUnnotify ? onUnnotify(startup.id) : onNotify?.(startup.id, startup.name))}
+              className="rounded p-1.5 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+              title={isNotified ? "Stop update emails" : "Get update emails"}
+            >
+              <BellIcon on={isNotified} size={18} />
             </button>
           )}
           {onDismiss && (

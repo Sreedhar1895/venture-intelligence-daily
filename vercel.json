@@ -2,6 +2,8 @@
   "crons": [
     { "path": "/api/ingest", "schedule": "0 6 * * *" },
     { "path": "/api/ingest/research", "schedule": "0 7 * * *" },
+    { "path": "/api/send-digest", "schedule": "0 7 * * *" },
+    { "path": "/api/ingest/accelerators", "schedule": "0 10 * * 0" },
     { "path": "/api/ingest/events", "schedule": "0 9 * * 0" },
     { "path": "/api/cron/tracked-startups", "schedule": "0 8 * * *" }
   ]

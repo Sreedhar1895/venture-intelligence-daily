@@ -50,6 +50,11 @@ export interface StartupSignals {
   raised_funding?: boolean;
 }
 
+export interface CofounderLinkedIn {
+  name: string;
+  url: string;
+}
+
 export interface Startup {
   id: string;
   name: string;
@@ -59,9 +64,13 @@ export interface Startup {
   why_interesting: string | null;
   featured: boolean;
   links: { label: string; url: string }[];
+  cofounder_linkedins?: CofounderLinkedIn[];
   relevance_score?: number;
   overall_score?: number;
   moat_note?: string | null;
+  accelerator?: string | null;
+  batch?: string | null;
+  university?: string | null;
   signals?: StartupSignals;
   created_at: string;
 }
